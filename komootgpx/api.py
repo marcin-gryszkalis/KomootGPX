@@ -82,12 +82,12 @@ class KomootApi:
         print("Found " + str(len(results)) + " tours")
         return results
 
-    def fetch_tour(self, tour_id):
+    def fetch_tour(self, tour_id, language="en"):
         print("Fetching tour '" + tour_id + "'...")
 
         r = self.__send_request("https://api.komoot.de/v007/tours/" + tour_id + "?_embedded=coordinates,way_types,"
                                                                                 "surfaces,directions,participants,"
-                                                                                "timeline&directions=v2&fields"
+                                                                                "timeline&hl=" + language + "&directions=v2&fields"
                                                                                 "=timeline&format=coordinate_array"
                                                                                 "&timeline_highlights_fields=tips,"
                                                                                 "recommenders",
@@ -99,5 +99,36 @@ class KomootApi:
 
         r = self.__send_request("https://api.komoot.de/v007/highlights/" + highlight_id + "/tips/",
                                 self.__build_header(), critical=False)
+
+        return r.json()
+
+    def fetch_tour_images(self, tour_id, silent=False):
+        if not silent:
+            print("Fetching images of tour '" + str(tour_id) + "'...")
+
+        results = {}
+        has_next_page = True
+        current_uri = "https://api.komoot.de/v007/tours/" + tour_id + "/cover_images/"
+        while has_next_page:
+            r = self.__send_request(current_uri, self.__build_header())
+
+            has_next_page = 'next' in r.json()['_links'] and 'href' in r.json()['_links']['next']
+            if has_next_page:
+                current_uri = r.json()['_links']['next']['href']
+
+            images = r.json().get('_embedded', {}).get('items', [])
+            for image in images:
+                results[image['id']] = image
+
+        print("Found " + str(len(results)) + " images")
+        return results
+
+    def fetch_highlight(self, highlight_id, silent=False):
+        if not silent:
+            print("Fetching highlight '" + str(highlight_id) + "'...")
+
+        results = {}
+        current_uri = "https://api.komoot.de/v007/highlights/" + str(highlight_id)
+        r = self.__send_request(current_uri, self.__build_header())
 
         return r.json()

@@ -8,6 +8,7 @@ from colorama import init
 
 from .api import *
 from .gpxcompiler import *
+from .imagedownload import *
 from .utils import *
 
 import argparse
@@ -33,6 +34,7 @@ def usage():
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-r', '--remove-deleted', 'Remove GPX files (from --output dir) without corresponding tour in Komoot (deleted and previous versions)'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-I', '--id-filename', 'Use only tour id for filename (no title)'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-D', '--add-date', 'Add tour date to file name'))
+    print('\t{:<2s}, {:<30s} {:<10s}'.format('-L', '--language', 'Select description language (fr, de, en..., default: en)'))
     print('\t{:<34s} {:<10s}'.format('--max-title-length=num', 'Crop title used in filename to given length (default: -1 = no limit)'))
 
     print('\n' + bcolor.OKBLUE + '[Filters]' + bcolor.ENDC)
@@ -47,6 +49,10 @@ def usage():
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-o', '--output=directory', 'Output directory (default: working directory)'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-e', '--no-poi', 'Do not include highlights as POIs'))
     print('\t{:<34s} {:<10s}'.format('--max-desc-length=count', 'Limit description length in characters (default: -1 = no limit)'))
+
+    print('\n' + bcolor.OKBLUE + '[Images]' + bcolor.ENDC)
+    print('\t{:<34s} {:<10s}'.format('--all-images', 'Download images from other users too - please review the copyright'))
+    print('\t{:<2s}, {:<30s} {:<10s}'.format('-i', '--add-images', 'Add tour images'))
 
     print('\n' + bcolor.OKBLUE + '[Other]' + bcolor.ENDC)
     print('\t{:<34s} {:<10s}'.format('--debug', 'Save all Komoot API responses in set of .txt files'))
@@ -141,10 +147,10 @@ def notify_interactive():
         print("Interactive mode. Use '--help' for usage details.")
 
 
-def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_date, max_title_length, max_desc_length):
+def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_date, max_title_length, max_desc_length, language):
     tour = None
     if tour_base is None:
-        tour_base = api.fetch_tour(str(tour_id))
+        tour_base = api.fetch_tour(str(tour_id), language=language)
         tour = tour_base
 
     # Example date: 2022-01-02T12:26:41.795+01:00
@@ -170,7 +176,7 @@ def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_dat
         return
 
     if tour is None:
-        tour = api.fetch_tour(str(tour_id))
+        tour = api.fetch_tour(str(tour_id), language=language)
     gpx = GpxCompiler(tour, api, no_poi, max_desc_length)
 
     f = open(path, "w", encoding="utf-8")
@@ -179,6 +185,73 @@ def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_dat
 
     print_success(f"GPX file written to '{path}'")
 
+def download_tour_images(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_date, max_title_length, all_images):
+    image_dir_contents = set()
+    images = api.fetch_tour_images(str(tour_id), silent=False)
+
+    if len(images) > 0:
+        date_str = tour_base['date'][:10]+'_' if add_date else ''
+
+        directoryname = sanitize_filename(tour_base['name'])
+        if max_title_length == 0:
+            directoryname = f"{tour_id}"
+        elif max_title_length > 0 and len(directoryname) > max_title_length:
+            directoryname = f"{directoryname[:max_title_length]}-{tour_id}"
+        else:
+            directoryname = f"{directoryname}-{tour_id}"
+
+        fullname = f"{date_str}{directoryname}_images"
+        image_dir = f"{output_dir}/{fullname}"
+
+        if os.path.exists(image_dir):
+            imagepat = re.compile(r"\.jpg$")
+            for f in os.listdir(image_dir):
+                if not os.path.isfile(f) or not imagepat.match(f):
+                    next
+                image_dir_contents.add(f)
+
+    for x in images:
+        creator_display_name = images[x].get('_embedded', {}).get('creator', {}).get('display_name', "")
+        highlight_id = images[x].get('highlight_id', None)
+        id = images[x].get('id')
+        if highlight_id and no_poi:
+            print_success(f"Also skipped image download for highlight/poi: {highlight_id} (--no-poi)")
+            continue
+
+        if not all_images and creator_display_name != api.display_name:
+            print_success(f"Image download skipped for image {id} from: {creator_display_name} - it doesn't belong to user {api.display_name}")
+            continue
+
+        if not os.path.exists(image_dir):
+            os.makedirs(image_dir)
+
+        third_party_copyright = ''
+        if creator_display_name != api.display_name:
+            third_party_copyright = '-3p'
+        dt = datetime.strptime(images[x]['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
+        output_date = dt.strftime("%Y%m%d-%H%M%S")
+        filename = sanitize_filename(output_date + "-hl" + str(x) + third_party_copyright + ".jpg")
+
+        path = f"{image_dir}/{filename}"
+
+        if filename in image_dir_contents:
+            image_dir_contents.remove(filename)
+
+        if skip_existing and os.path.exists(path):
+            print_success(f"image download skipped - id {x} already exists at '{path}'")
+            continue
+
+        downloader = ImageDownloaderWithExif(
+            images[x],
+            api,
+            no_poi,
+            all_images,
+            timezone="UTC"
+        )
+
+        saved_image = downloader.download_and_save(path)
+        if saved_image:
+            print_success(f"Saved {shorten_path(saved_image, 120)}")
 
 def main(args):
 
@@ -230,6 +303,9 @@ def main(args):
     add_date = args.add_date
     output_dir = args.output
     no_poi = args.no_poi
+    add_images = args.add_images
+    language = args.language
+    all_images = args.all_images
 
     # Parse date ranges
     start_date = None
@@ -315,15 +391,23 @@ def main(args):
 
     if tour_selection == "all":
         for x in tours:
-            make_gpx(x, api, output_dir, no_poi, skip_existing, tours[x], add_date, max_title_length, max_desc_length)
+            make_gpx(x, api, output_dir, no_poi, skip_existing, tours[x], add_date, max_title_length, max_desc_length, language)
+            if add_images and not anonymous:
+                download_tour_images(x, api, output_dir, no_poi, skip_existing, tours[x], add_date, max_title_length, all_images)
     else:
         if anonymous:
-            make_gpx(tour_selection, api, output_dir, no_poi, False, None, add_date, max_title_length, max_desc_length)
+            make_gpx(tour_selection, api, output_dir, no_poi, False, None, add_date, max_title_length, max_desc_length, language)
+            if add_images:
+                print_warning(f"Warning: No image download in anonymous mode.")
         else:
             if int(tour_selection) in tours:
-                make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, tours[int(tour_selection)], add_date, max_title_length, max_desc_length)
+                make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, tours[int(tour_selection)], add_date, max_title_length, max_desc_length, language)
+                if add_images:
+                    download_tour_images(tour_selection, api, output_dir, no_poi, skip_existing, tours[int(tour_selection)], add_date, max_title_length, all_images)
             else:
-                make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, None, add_date, max_title_length, max_desc_length)
+                make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, None, add_date, max_title_length, max_desc_length, language)
+                if add_images:
+                    download_tour_images(tour_selection, api, output_dir, no_poi, skip_existing, None, add_date, max_title_length, all_images)
     print()
 
     if remove_deleted:
@@ -353,6 +437,7 @@ def parse_args():
     parser.add_argument("-p", "--pass", dest="pwd", type=str, help="Password for login")
     parser.add_argument("-n", "--anonymous", action="store_true", default=False, help="Login anonymously")
     parser.add_argument("-l", "--list-tours", action="store_true", help="Print available tours")
+    parser.add_argument("-L", "--language", type=str, default="en", help="Select description language (default=en)")
     parser.add_argument("-d", "--make-gpx", type=int, help="Download GPX for selected tour")
     parser.add_argument("-a", "--make-all", action="store_true", help="Download all tours")
     parser.add_argument("-s", "--skip-existing", action="store_true", help="Skip already downloaded tours")
@@ -370,6 +455,8 @@ def parse_args():
     parser.add_argument("--private-only", action="store_true", help="Include only private tours")
     parser.add_argument("--public-only", action="store_true", help="Include only public tours")
     parser.add_argument("-o", "--output", type=str, default=os.getcwd(), help="Output directory")
+    parser.add_argument("-i", "--add-images", action="store_true", default=False, help="Add tour images")
+    parser.add_argument("--all-images", action="store_true", default=False, help="Download images from other users too - please review the copyright")
     parser.add_argument("-e", "--no-poi", action="store_true", help="Do not include POIs in GPX")
     parser.add_argument("--debug", action="store_true", default=False, help="Debug")
     parser.add_argument("-h", "--help", action="store_true", help="Prints help")

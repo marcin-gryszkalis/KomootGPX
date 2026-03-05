@@ -73,6 +73,7 @@ komootgpx.py [options]
         -I, --id-filename                  Use only tour id for filename (no title)
         -D, --add-date                     Add tour date to file name
         --max-title-length=num             Crop title used in filename to given length (default: -1 = no limit)
+        -L, --language                     Set tour description to specific language (fr, de, en..., default: en)
 
 [Filters]
         -t, --tour-type=type               Filter by track type ("planned", "recorded" or "all")
@@ -86,6 +87,10 @@ komootgpx.py [options]
         -o, --output=directory             Output directory (default: working directory)
         -e, --no-poi                       Do not include highlights as POIs
         --max-desc-length=count            Limit description length in characters (default: -1 = no limit)
+
+[Images]
+        -i, --add-images                   Add tour images
+        --all-images                       Download images from other users too - copyright review is required
 
 [Other]
         --debug                            Save all Komoot API responses in set of .txt files
