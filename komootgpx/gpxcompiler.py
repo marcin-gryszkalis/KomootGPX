@@ -42,10 +42,11 @@ def extract_user_from_tip(json):
 
 
 class GpxCompiler:
-    def __init__(self, tour, api, no_poi=False, max_desc_length=-1):
+    def __init__(self, tour, api, no_poi=False, max_desc_length=-1, karoo=False):
         self.api = api
         self.tour = tour
         self.no_poi = no_poi
+        self.karoo = karoo
 
         self.route = []
         for coord in tour["_embedded"]["coordinates"]["items"]:
@@ -162,6 +163,9 @@ class GpxCompiler:
                 wp.link_text = "View POI on Komoot"
                 wp.type = poi.type
                 wp.comment = poi.image_url
+                if self.karoo:
+                    wp.type = "Generic"
+                    wp.symbol = "Generic"
 
                 gpx.waypoints.append(wp)
 

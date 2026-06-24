@@ -48,6 +48,7 @@ def usage():
     print('\n' + bcolor.OKBLUE + '[Generator]' + bcolor.ENDC)
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-o', '--output=directory', 'Output directory (default: working directory)'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-e', '--no-poi', 'Do not include highlights as POIs'))
+    print('\t{:<2s}, {:<30s} {:<10s}'.format('-K', '--karoo', 'Save all POIs with Generic type (Hammerhead Karoo import compatibility)'))
     print('\t{:<34s} {:<10s}'.format('--max-desc-length=count', 'Limit description length in characters (default: -1 = no limit)'))
 
     print('\n' + bcolor.OKBLUE + '[Images]' + bcolor.ENDC)
@@ -147,7 +148,7 @@ def notify_interactive():
         print("Interactive mode. Use '--help' for usage details.")
 
 
-def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_date, max_title_length, max_desc_length, language):
+def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_date, max_title_length, max_desc_length, language, karoo=False):
     tour = None
     if tour_base is None:
         tour_base = api.fetch_tour(str(tour_id), language=language)
@@ -177,7 +178,7 @@ def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_dat
 
     if tour is None:
         tour = api.fetch_tour(str(tour_id), language=language)
-    gpx = GpxCompiler(tour, api, no_poi, max_desc_length)
+    gpx = GpxCompiler(tour, api, no_poi, max_desc_length, karoo)
 
     f = open(path, "w", encoding="utf-8")
     f.write(gpx.generate())
@@ -303,6 +304,7 @@ def main(args):
     add_date = args.add_date
     output_dir = args.output
     no_poi = args.no_poi
+    karoo = args.karoo
     add_images = args.add_images
     language = args.language
     all_images = args.all_images
@@ -391,21 +393,21 @@ def main(args):
 
     if tour_selection == "all":
         for x in tours:
-            make_gpx(x, api, output_dir, no_poi, skip_existing, tours[x], add_date, max_title_length, max_desc_length, language)
+            make_gpx(x, api, output_dir, no_poi, skip_existing, tours[x], add_date, max_title_length, max_desc_length, language, karoo)
             if add_images and not anonymous:
                 download_tour_images(x, api, output_dir, no_poi, skip_existing, tours[x], add_date, max_title_length, all_images)
     else:
         if anonymous:
-            make_gpx(tour_selection, api, output_dir, no_poi, False, None, add_date, max_title_length, max_desc_length, language)
+            make_gpx(tour_selection, api, output_dir, no_poi, False, None, add_date, max_title_length, max_desc_length, language, karoo)
             if add_images:
                 print_warning(f"Warning: No image download in anonymous mode.")
         else:
             if int(tour_selection) in tours:
-                make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, tours[int(tour_selection)], add_date, max_title_length, max_desc_length, language)
+                make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, tours[int(tour_selection)], add_date, max_title_length, max_desc_length, language, karoo)
                 if add_images:
                     download_tour_images(tour_selection, api, output_dir, no_poi, skip_existing, tours[int(tour_selection)], add_date, max_title_length, all_images)
             else:
-                make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, None, add_date, max_title_length, max_desc_length, language)
+                make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, None, add_date, max_title_length, max_desc_length, language, karoo)
                 if add_images:
                     download_tour_images(tour_selection, api, output_dir, no_poi, skip_existing, None, add_date, max_title_length, all_images)
     print()
@@ -458,6 +460,7 @@ def parse_args():
     parser.add_argument("-i", "--add-images", action="store_true", default=False, help="Add tour images")
     parser.add_argument("--all-images", action="store_true", default=False, help="Download images from other users too - please review the copyright")
     parser.add_argument("-e", "--no-poi", action="store_true", help="Do not include POIs in GPX")
+    parser.add_argument("-K", "--karoo", action="store_true", help="Save all POIs with Generic type (Hammerhead Karoo import compatibility)")
     parser.add_argument("--debug", action="store_true", default=False, help="Debug")
     parser.add_argument("-h", "--help", action="store_true", help="Prints help")
     return parser.parse_args()
