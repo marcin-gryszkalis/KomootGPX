@@ -86,6 +86,7 @@ komootgpx.py [options]
 [Generator]
         -o, --output=directory             Output directory (default: working directory)
         -e, --no-poi                       Do not include highlights as POIs
+        -K, --karoo                        Save all POIs with Generic type (Hammerhead Karoo import compatibility)
         --max-desc-length=count            Limit description length in characters (default: -1 = no limit)
 
 [Images]
