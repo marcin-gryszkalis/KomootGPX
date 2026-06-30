@@ -9,6 +9,7 @@ Download Komoot tracks and highlights as GPX files with metadata
 * Includes metadata such as estimated duration, total elevation, difficulty and the original Komoot trip URL
 * Can add trip highlights as POIs into the GPX file
   * Includes user comments & image URLs for each highlight POI, as those often contain helpful information about the location
+  * Additionally custom Komoot waypoints can be added as POIs
 
 
 ## Installation
