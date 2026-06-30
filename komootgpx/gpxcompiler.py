@@ -197,7 +197,7 @@ class GpxCompiler:
                 wp.comment = poi.image_url
                 if self.karoo:
                     if wp.type in karooremap:
-                        wp.type = karooremap[type]
+                        wp.type = karooremap[wp.type]
                     if wp.type not in karootypes:
                         wp.type = "Generic"
                     wp.symbol = wp.type
