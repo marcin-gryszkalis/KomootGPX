@@ -2,6 +2,14 @@ from datetime import datetime, timedelta
 
 import gpxpy.gpx
 
+category2type = dict(enumerate(["Generic", "Summit", "Valley", "Water", "Food", "Danger", "First aid", "Segment start", "Segment end",
+"Campsite", "Aid station", "Rest area", "Service", "Checkpoint", "Meeting point", "Toilet", "Gear", "Sharp curve",
+"Steep incline", "Tunnel", "Shower", "Bridge", "Obstacle", "Crossing", "Store", "Transition", "Transport", "Info",
+"Cafe", "Restaurant", "Art", "Parking", "Park", "Beach", "Viewpoint", "Bike shop", "Attraction", "Gas station",
+"Lodging", "Pub"]))
+
+karootypes = ["Camping", "Danger", "Food", "Geocache", "Lodging", "Parking", "Summit", "Water"]
+karooremap = {"Campsite" : "Camping"}
 
 class Point:
     CONST_UNDEFINED = -9999
@@ -58,7 +66,7 @@ class GpxCompiler:
         self.pois = []
         if "timeline" in tour["_embedded"] and "_embedded" in tour["_embedded"]["timeline"]:
             for item in tour["_embedded"]["timeline"]["_embedded"]["items"]:
-                if item["type"] != "poi" and item["type"] != "highlight":
+                if item["type"] != "poi" and item["type"] != "highlight" and item["type"] != "point":
                     continue
 
                 ref = item["_embedded"]["reference"]
@@ -101,6 +109,30 @@ class GpxCompiler:
                         details = details[:max_desc_length - 3] + "..."
 
                     self.pois.append(POI(name, point, image_url, url, details, "Highlight"))
+
+                elif item["type"] == "point" and "category" in ref: # points without category are pointless (usually starting/ending point)
+                    name = "Unknown Point"
+                    category = ref["category"]
+                    point = Point({})
+
+                    if "name" in ref:
+                        name = ref["name"]
+                    if "location" in ref:
+                        point = Point(ref["location"])
+
+                    details = ""
+                    if "description" in ref:
+                        details =ref["description"]
+                        if max_desc_length == 0:
+                            details = ""
+                        elif max_desc_length > 0 and len(details) > max_desc_length:
+                            details = details[:max_desc_length - 3] + "..."
+
+                    type = "Generic"
+                    if category in category2type:
+                        type = category2type[category]
+
+                    self.pois.append(POI(name, point, '', '', details, type))
 
     def generate(self):
         gpx = gpxpy.gpx.GPX()
@@ -164,8 +196,11 @@ class GpxCompiler:
                 wp.type = poi.type
                 wp.comment = poi.image_url
                 if self.karoo:
-                    wp.type = "Generic"
-                    wp.symbol = "Generic"
+                    if wp.type in karooremap:
+                        wp.type = karooremap[wp.type]
+                    if wp.type not in karootypes:
+                        wp.type = "Generic"
+                    wp.symbol = wp.type
 
                 gpx.waypoints.append(wp)
 
