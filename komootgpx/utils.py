@@ -1,5 +1,5 @@
 import getpass
-
+import re
 
 class bcolor:
     HEADER = '\033[95m'
@@ -59,6 +59,36 @@ def sanitize_filename(value):
     for c in '\\/:*?"<>|':
         value = value.replace(c, '')
     return value
+
+def sanitize_filename(value):
+    # Remove NUL and the only real Unix path separator
+    value = value.replace('\0', '').replace('/', '')
+
+
+RESERVED_NAMES = {
+    'CON', 'PRN', 'AUX', 'NUL',
+    *(f'COM{i}' for i in range(1, 10)),
+    *(f'LPT{i}' for i in range(1, 10)),
+    '.', '..', ''
+}
+
+def sanitize_filename(value):
+    # Strip illegal chars and control characters
+    value = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '', value)
+
+    # Strip trailing dots/spaces (strange Windows rule)
+    value = value.rstrip('. ')
+
+    name_part = value.split('.')[0].upper()
+    if name_part in RESERVED_NAMES:
+        value = '_' + value
+
+    if not value:
+        value = 'unnamed'
+
+    return value
+
+
 
 def shorten_path(path: str, max_len: int = 60) -> str:
     if len(path) <= max_len:
