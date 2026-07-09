@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-import datetime
+from datetime import datetime, timezone
 import json
 
 from colorama import init
@@ -61,10 +61,13 @@ def usage():
 
 def is_tour_in_date_range(tour, start_date, end_date):
     """Check if a tour falls within the specified date range."""
-    if 'date' not in tour:
-        return True  # If tour has no date info, include it
+    if 'changed_at' not in tour:
+        if 'date' in tour:
+            tour['changed_at'] = tour['date']
+        else:
+            return True  # If tour has no date info (both date and changed_at), include it
 
-    tour_date_str = tour['date'][:10]  # Extract YYYY-MM-DD
+    tour_date_str = tour['changed_at'][:10]  # Extract YYYY-MM-DD
     tour_date = datetime.strptime(tour_date_str, "%Y-%m-%d").date()
 
     # If only start_date is provided, include all tours on or after start_date
@@ -147,6 +150,14 @@ def notify_interactive():
     if interactive_info_shown:
         print("Interactive mode. Use '--help' for usage details.")
 
+def parse_date_str(date_str):
+    # Handles ISO 8601 with 'Z' suffix
+    # python 3.11 has datetime.fromisoformat() with support of Z
+    return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+
+def get_file_mtime(path):
+    # return datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
+    return datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
 
 def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_date, max_title_length, max_desc_length, language, karoo=False):
     tour = None
@@ -154,27 +165,40 @@ def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_dat
         tour_base = api.fetch_tour(str(tour_id), language=language)
         tour = tour_base
 
-    # Example date: 2022-01-02T12:26:41.795+01:00
-    # :10 extracts "2022-01-02" from this.
-    date_str = tour_base['date'][:10]+'_' if add_date else ''
+    tour_changed_at = parse_date_str(tour_base['changed_at']).timestamp()
 
-    filename = sanitize_filename(tour_base['name'])
+    file_title = sanitize_filename(tour_base['name'])
     if max_title_length == 0:
-        filename = f"{tour_id}"
-    elif max_title_length > 0 and len(filename) > max_title_length:
-        filename = f"{filename[:max_title_length]}-{tour_id}"
-    else:
-        filename = f"{filename}-{tour_id}"
+        file_title = ""
+    elif max_title_length > 0 and len(file_title) > max_title_length:
+        file_title = file_title[:max_title_length]
 
-    fullname = f"{date_str}{filename}.gpx"
+    filename_pattern = "{title}-{tour_id}.gpx"
+    if add_date:
+        filename_pattern = "{changed_date}_{title}-{tour_id}.gpx"
+
+    filename = filename_pattern.format(
+        changed_date = tour_base['changed_at'][:10],
+        title = file_title,
+        tour_id = tour_id
+        )
+
+    fullname = sanitize_filename(filename)
     path = f"{output_dir}/{fullname}"
 
     if fullname in output_dir_contents:
         output_dir_contents.remove(fullname)
 
     if skip_existing and os.path.exists(path):
-        print_success(f"{tour_base['name']} skipped - already exists at '{path}'")
-        return
+        gpx_mtime = os.path.getmtime(path)
+
+        if gpx_mtime >= tour_changed_at:
+            print_success(f"{tour_base['name']} skipped - unchanged at '{path}'")
+            return
+
+        print_success(f"{tour_base['name']} updated")
+
+
 
     if tour is None:
         tour = api.fetch_tour(str(tour_id), language=language)
@@ -184,6 +208,9 @@ def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_dat
     f.write(gpx.generate())
     f.close()
 
+    # set file mtime/atime to the value of `changed_at` property of tour
+    os.utime(path, (tour_changed_at, tour_changed_at))
+
     print_success(f"GPX file written to '{path}'")
 
 def download_tour_images(tour_id, api, output_dir, no_poi, skip_existing, tour_base, add_date, max_title_length, all_images):
@@ -191,7 +218,7 @@ def download_tour_images(tour_id, api, output_dir, no_poi, skip_existing, tour_b
     images = api.fetch_tour_images(str(tour_id), silent=False)
 
     if len(images) > 0:
-        date_str = tour_base['date'][:10]+'_' if add_date else ''
+        date_str = tour_base['changed_at'][:10]+'_' if add_date else ''
 
         directoryname = sanitize_filename(tour_base['name'])
         if max_title_length == 0:
