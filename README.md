@@ -77,7 +77,7 @@ komootgpx.py [options]
         -r, --remove-deleted               Remove GPX files (from --output dir) without corresponding tour
                                                 in Komoot (deleted and previous versions)
         -f, --filename-pattern=pattern     Specify filename pattern, default: "{title}-{id}.gpx",
-                                                available fields: title, id, date, datetime
+                                                available fields: title, id, date, time
         -I, --id-filename                  Use only tour id for filename (no title), equal to -f "{id}.gpx"
         -D, --add-date                     Add tour date to file name, equal to -f "{date}_{title}-{id}.gpx"
         --max-title-length=num             Crop title used in filename to given length

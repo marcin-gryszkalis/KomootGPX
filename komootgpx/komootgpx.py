@@ -33,7 +33,7 @@ def usage():
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-s', '--skip-existing', 'Do not download and save GPX if the file already exists, ignored with -d'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-S', '--skip-unchanged', 'Do not download and save GPX if the tour has not changed since last download, ignored with -d and -s'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-r', '--remove-deleted', 'Remove GPX files (from --output dir) without corresponding tour in Komoot (deleted and previous versions)'))
-    print('\t{:<2s}, {:<30s} {:<10s}'.format('-f', '--filename-pattern=pattern', 'Specify filename pattern, default: "{title}-{id}.gpx", available fields: title, id, date, datetime'))
+    print('\t{:<2s}, {:<30s} {:<10s}'.format('-f', '--filename-pattern=pattern', 'Specify filename pattern, default: "{title}-{id}.gpx", available fields: title, id, date, time'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-I', '--id-filename', 'Use only tour id for filename (no title), equal to -f "{id}.gpx"'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-D', '--add-date', 'Add tour date to file name, equal to -f "{date}_{title}-{id}.gpx"'))
     print('\t{:<2s}, {:<30s} {:<10s}'.format('-L', '--language', 'Select description language (fr, de, en..., default: en)'))
@@ -157,10 +157,6 @@ def parse_date_str(date_str):
     # python 3.11 has datetime.fromisoformat() with support of Z
     return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
 
-def get_file_mtime(path):
-    # return datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
-    return datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
-
 def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, skip_unchanged, tour_base, filename_pattern, max_title_length, max_desc_length, language, karoo=False):
     tour = None
     if tour_base is None:
@@ -177,6 +173,7 @@ def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, skip_unchanged, to
 
     filename = filename_pattern.format(
         date = tour_base['changed_at'][:10],
+        time = re.sub(r'.*T(\d+):(\d+):(\d+).*', '\1:\2:\3', tour_base['changed_at']),
         title = file_title,
         id = tour_id
         )
@@ -211,7 +208,7 @@ def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, skip_unchanged, to
 
     print_success(f"GPX file written to '{path}'")
 
-def download_tour_images(tour_id, api, output_dir, no_poi, skip_existing, tour_base, image_pattern, max_title_length, all_images):
+def download_tour_images(tour_id, api, output_dir, no_poi, skip_existing, tour_base, image_dir_pattern, max_title_length, all_images):
     image_dir_contents = set()
     images = api.fetch_tour_images(str(tour_id), silent=False)
 
@@ -225,8 +222,9 @@ def download_tour_images(tour_id, api, output_dir, no_poi, skip_existing, tour_b
         elif max_title_length > 0 and len(file_title) > max_title_length:
             file_title = file_title[:max_title_length]
 
-        image_dir_name = image_pattern.format(
+        image_dir_name = image_dir_pattern.format(
             date = tour_base['changed_at'][:10],
+            time = re.sub(r'.*T(\d+):(\d+):(\d+).*', '\1:\2:\3', tour_base['changed_at']),
             title = file_title,
             id = tour_id
             )
@@ -328,14 +326,14 @@ def main(args):
     max_desc_length = args.max_desc_length
 
     filename_pattern = args.filename_pattern
-    image_pattern = "{title}-{id}_images/{image}.jpg"
+    image_dir_pattern = "{title}-{id}_images"
 
     if args.add_date:
         filename_pattern = "{date}_{title}-{id}.gpx"
-        image_pattern = "{date}_{title}-{id}_images"
+        image_dir_pattern = "{date}_{title}-{id}_images"
     elif args.id_filename:
         filename_pattern = "{id}.gpx"
-        image_pattern = "{id}_images"
+        image_dir_pattern = "{id}_images"
 
     output_dir = args.output
     no_poi = args.no_poi
@@ -430,7 +428,7 @@ def main(args):
         for x in tours:
             make_gpx(x, api, output_dir, no_poi, skip_existing, skip_unchanged, tours[x], filename_pattern, max_title_length, max_desc_length, language, karoo)
             if add_images and not anonymous:
-                download_tour_images(x, api, output_dir, no_poi, skip_existing, tours[x], image_pattern, max_title_length, all_images)
+                download_tour_images(x, api, output_dir, no_poi, skip_existing, tours[x], image_dir_pattern, max_title_length, all_images)
     else:
         if anonymous:
             make_gpx(tour_selection, api, output_dir, no_poi, False, False, None, filename_pattern, max_title_length, max_desc_length, language, karoo)
@@ -440,11 +438,11 @@ def main(args):
             if int(tour_selection) in tours:
                 make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, skip_unchanged, tours[int(tour_selection)], filename_pattern, max_title_length, max_desc_length, language, karoo)
                 if add_images:
-                    download_tour_images(tour_selection, api, output_dir, no_poi, skip_existing, tours[int(tour_selection)], image_pattern, max_title_length, all_images)
+                    download_tour_images(tour_selection, api, output_dir, no_poi, skip_existing, tours[int(tour_selection)], image_dir_pattern, max_title_length, all_images)
             else:
                 make_gpx(tour_selection, api, output_dir, no_poi, skip_existing, skip_unchanged, None, filename_pattern, max_title_length, max_desc_length, language, karoo)
                 if add_images:
-                    download_tour_images(tour_selection, api, output_dir, no_poi, skip_existing, None, image_pattern, max_title_length, all_images)
+                    download_tour_images(tour_selection, api, output_dir, no_poi, skip_existing, None, image_dir_pattern, max_title_length, all_images)
     print()
 
     if remove_deleted:
