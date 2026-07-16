@@ -13,6 +13,10 @@ from .utils import *
 
 import argparse
 
+# in minutes
+SESSION_TTL = 15
+CREDFILE = "credentials.json"
+
 init()
 interactive_info_shown = False
 
@@ -371,34 +375,39 @@ def main(args):
 
     if not anonymous:
         token = None
-        if os.path.exists("credentials.json"):
-            with open("credentials.json", "r", encoding="utf-8") as credfile:
+        uid = None
+        if os.path.exists(CREDFILE):
+            with open(CREDFILE, "r", encoding="utf-8") as credfile:
                 creddata = json.load(credfile)
-                mail = creddata.get("user_id")
+                uid = creddata.get("user_id")
                 token = creddata.get("token")
                 date = creddata.get("date")
-                if datetime.now().timestamp() - date > 15*60:
-                    print("Stored credentials are outdated. Please provide login details.")
+                display_name = creddata.get("display_name", "(token user)")
+
+                if datetime.now().timestamp() - date > SESSION_TTL * 60:
+                    print("Stored credentials are outdated.")
+                    uid = None
                     token = None
-                api.display_name = creddata.get("display_name", "(token user)")
-                pwd = ""
-                if mail and token:
-                    print("Using stored credentials for user:", mail)
-                else:
-                    print_error("Stored credentials are incomplete. Please provide login details.")
+                elif uid is None or token is None:
+                    print_error("Stored credentials are incomplete.")
+                    os.unlink(CREDFILE)
                     sys.exit(1)
 
-        if mail is None:
-            notify_interactive()
-            mail = prompt("Enter your mail address (komoot login)")
+        if uid and token:
+            print("Using stored credentials for user:", mail)
+            api.login_with_token(uid, token, display_name)
+        else:
+            if mail is None:
+                notify_interactive()
+                mail = prompt("Enter your mail address (komoot login)")
 
-        if pwd is None:
-            notify_interactive()
-            pwd = prompt_pass("Enter your password (input hidden)")
+            if pwd is None:
+                notify_interactive()
+                pwd = prompt_pass("Enter your password (input hidden)")
 
-        api.login(mail, pwd, token)
+            api.login(mail, pwd)
 
-        with open("credentials.json", "w", encoding="utf-8") as credfile:
+        with open(CREDFILE, "w", encoding="utf-8") as credfile:
             creddata = {"user_id": api.user_id, "token": api.token, "display_name": api.display_name, "date": datetime.now().timestamp()}
             json.dump(creddata, credfile)
 

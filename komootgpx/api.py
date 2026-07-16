@@ -42,22 +42,27 @@ class KomootApi:
                 exit(1)
         return r
 
-    def login(self, email, password, token=None):
+    def login(self, email, password):
         print("Logging in...")
 
-        if token is None:
-            r = self.__send_request("https://api.komoot.de/v006/account/email/" + email + "/",
-                                        BasicAuthToken(email, password))
+        r = self.__send_request("https://api.komoot.de/v006/account/email/" + email + "/",
+                                    BasicAuthToken(email, password))
 
-            self.user_id = r.json()['username']
-            self.token = r.json()['password']
-            self.display_name = r.json()["user"]["displayname"]
-        else:
-            self.user_id = email
-            self.token = token
+        rj = r.json()
+        self.user_id = rj['username']
+        self.token = rj['password']
+        self.display_name = rj["user"]["displayname"]
 
         print("Logged in as '" + self.display_name + "'")
-        return self.user_id, self.token, self.display_name
+
+    def login_with_token(self, user_id, token, display_name):
+        print("Logging in with token...")
+
+        self.user_id = user_id
+        self.token = token
+        self.display_name = display_name
+
+        print("Logged in as '" + self.display_name + "'")
 
     def fetch_tours(self, tour_type="tour_all", silent=False):
         if not silent:
