@@ -34,13 +34,13 @@ class Point:
 
 
 class POI:
-    def __init__(self, name, point, image_url, url, description, type):
+    def __init__(self, name, point, image_url, url, description, poitype):
         self.name = name
         self.point = point
         self.url = url
         self.image_url = image_url
         self.description = description
-        self.type = type
+        self.type = poitype
 
 
 def extract_user_from_tip(json):
@@ -128,11 +128,11 @@ class GpxCompiler:
                         elif max_desc_length > 0 and len(details) > max_desc_length:
                             details = details[:max_desc_length - 3] + "..."
 
-                    type = "Generic"
+                    poitype = "Generic"
                     if category in category2type:
-                        type = category2type[category]
+                        poitype = category2type[category]
 
-                    self.pois.append(POI(name, point, '', '', details, type))
+                    self.pois.append(POI(name, point, '', '', details, poitype))
 
     def generate(self):
         gpx = gpxpy.gpx.GPX()

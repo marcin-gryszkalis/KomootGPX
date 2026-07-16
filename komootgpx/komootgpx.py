@@ -1,23 +1,21 @@
 import os
 import re
 import sys
-from datetime import datetime, timezone
-import json
-
-from colorama import init
-
-from .api import *
-from .gpxcompiler import *
-from .imagedownload import *
-from .utils import *
-
 import argparse
+import json
+from datetime import datetime
+from colorama import init as colorama_init
+
+from .api import KomootApi
+from .gpxcompiler import GpxCompiler
+from .imagedownload import ImageDownloaderWithExif
+from .utils import *
 
 # in minutes
 SESSION_TTL = 15
 CREDFILE = "credentials.json"
 
-init()
+colorama_init()
 interactive_info_shown = False
 
 output_dir_contents = set()
@@ -156,11 +154,6 @@ def notify_interactive():
     if interactive_info_shown:
         print("Interactive mode. Use '--help' for usage details.")
 
-def parse_date_str(date_str):
-    # Handles ISO 8601 with 'Z' suffix
-    # python 3.11 has datetime.fromisoformat() with support of Z
-    return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
-
 def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, skip_unchanged, tour_base, filename_pattern, max_title_length, max_desc_length, language, karoo=False):
     tour = None
     if tour_base is None:
@@ -203,9 +196,8 @@ def make_gpx(tour_id, api, output_dir, no_poi, skip_existing, skip_unchanged, to
         tour = api.fetch_tour(str(tour_id), language=language)
     gpx = GpxCompiler(tour, api, no_poi, max_desc_length, karoo)
 
-    f = open(path, "w", encoding="utf-8")
-    f.write(gpx.generate())
-    f.close()
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(gpx.generate())
 
     # set file mtime/atime to the value of `changed_at` property of tour
     os.utime(path, (tour_changed_at, tour_changed_at))
@@ -368,7 +360,7 @@ def main(args):
         os.makedirs(output_dir)
     for f in os.listdir(output_dir):
         if not os.path.isfile(f) or not gpxpat.match(f):
-            next
+            continue
         output_dir_contents.add(f)
 
     api = KomootApi(debug=args.debug)

@@ -1,7 +1,7 @@
+import sys
 import base64
 import json
 import requests
-import json
 
 from .utils import print_error, bcolor
 
@@ -33,13 +33,13 @@ class KomootApi:
         r = requests.get(url, auth=auth)
 
         if self.debug:
-            with open(f"komootgpx-debug-{self.request_count}.txt", "w") as dbgf:
+            with open(f"komootgpx-debug-{self.request_count}.txt", "w", encoding="utf-8") as dbgf:
                 dbgf.write(r.text)
 
         if r.status_code != 200:
             print_error("Error " + str(r.status_code) + ": " + str(r.json()))
             if critical:
-                exit(1)
+                sys.exit(1)
         return r
 
     def login(self, email, password):

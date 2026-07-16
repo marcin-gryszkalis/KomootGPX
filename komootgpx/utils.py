@@ -1,5 +1,6 @@
 import getpass
 import re
+from datetime import datetime, timezone
 
 class bcolor:
     HEADER = '\033[95m'
@@ -11,17 +12,14 @@ class bcolor:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-
 def boolToColorStr(b):
     if b:
         return bcolor.OKGREEN + "true" + bcolor.ENDC
     else:
         return bcolor.FAIL + "false" + bcolor.ENDC
 
-
 def print_error(text):
     print(bcolor.FAIL + text + bcolor.ENDC)
-
 
 def print_success(text):
     print(bcolor.OKGREEN + text + bcolor.ENDC)
@@ -41,7 +39,6 @@ def prompt(title):
     print()
     return selection
 
-
 def prompt_pass(title):
     print()
     print(bcolor.BOLD + bcolor.HEADER + title + bcolor.ENDC)
@@ -53,17 +50,6 @@ def prompt_pass(title):
         break
     print()
     return selection
-
-
-def sanitize_filename(value):
-    for c in '\\/:*?"<>|':
-        value = value.replace(c, '')
-    return value
-
-def sanitize_filename(value):
-    # Remove NUL and the only real Unix path separator
-    value = value.replace('\0', '').replace('/', '')
-
 
 RESERVED_NAMES = {
     'CON', 'PRN', 'AUX', 'NUL',
@@ -88,11 +74,14 @@ def sanitize_filename(value):
 
     return value
 
-
-
 def shorten_path(path: str, max_len: int = 60) -> str:
     if len(path) <= max_len:
         return path
     # Keep start and end, replace middle with "..."
     keep = (max_len - 3) // 2
     return f"{path[:keep]}...{path[-keep:]}"
+
+def parse_date_str(date_str):
+    # Handles ISO 8601 with 'Z' suffix
+    # python 3.11 has datetime.fromisoformat() with support of Z
+    return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
