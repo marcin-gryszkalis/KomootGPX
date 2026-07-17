@@ -63,18 +63,27 @@ komootgpx.py [options]
 [Authentication]
         -m, --mail=mail_address            Login using specified email address
         -p, --pass=password                Use provided password and skip interactive prompt
-        -n, --anonymous                    Skip authentication, no interactive prompt, valid only with -d
+        -n, --anonymous                    Skip authentication, no interactive prompt,
+                                                valid only with -d
 
 [Tours]
         -l, --list-tours                   List all tours of the logged in user
         -d, --make-gpx=tour_id             Download tour as GPX
         -a, --make-all                     Download all tours
-        -s, --skip-existing                Do not download and save GPX if the file already exists, ignored with -d
-        -r, --remove-deleted               Remove GPX files (from --output dir) without corresponding tour in Komoot (deleted and previous versions)
-        -I, --id-filename                  Use only tour id for filename (no title)
-        -D, --add-date                     Add tour date to file name
-        --max-title-length=num             Crop title used in filename to given length (default: -1 = no limit)
-        -L, --language                     Set tour description to specific language (fr, de, en..., default: en)
+        -s, --skip-existing                Do not download and save GPX if the file already exists,
+                                                ignored with -d
+        -S, --skip-unchanged               Do not download and save GPX if the tour has not changed since
+                                                last download, ignored with -d and -s
+        -r, --remove-deleted               Remove GPX files (from --output dir) without corresponding tour
+                                                in Komoot (deleted and previous versions)
+        -f, --filename-pattern=pattern     Specify filename pattern, default: "{title}-{id}.gpx",
+                                                available fields: title, id, date, time
+        -I, --id-filename                  Use only tour id for filename (no title), equal to -f "{id}.gpx"
+        -D, --add-date                     Add tour date to file name, equal to -f "{date}_{title}-{id}.gpx"
+        --max-title-length=num             Crop title used in filename to given length
+                                                default: -1 = no limit
+        -L, --language                     Set tour description to specific language:
+                                                fr, de, en..., default: en
 
 [Filters]
         -t, --tour-type=type               Filter by track type ("planned", "recorded" or "all")
@@ -87,7 +96,8 @@ komootgpx.py [options]
 [Generator]
         -o, --output=directory             Output directory (default: working directory)
         -e, --no-poi                       Do not include highlights as POIs
-        -K, --karoo                        Save all POIs with Generic type (Hammerhead Karoo import compatibility)
+        -K, --karoo                        Save all POIs with Generic type
+                                                (Hammerhead Karoo import compatibility)
         --max-desc-length=count            Limit description length in characters (default: -1 = no limit)
 
 [Images]
